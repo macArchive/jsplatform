@@ -21,12 +21,17 @@ Hero.prototype.jump = function () {
 
   return canJump
 }
+Hero.prototype.bounce = function () {
+  const BOUNCE_SPEED = 200
+  this.body.velocity.y = -BOUNCE_SPEED
+}
 
 // * Enemies
 function Spider(game, x, y) {
   Phaser.Sprite.call(this, game, x, y, 'spider')
   this.anchor.set(0.5)
   this.animations.add('crawl', [0, 1, 2], 8, true)
+  this.animations.add('die', [0, 4, 0, 4, 0, 4, 3, 3, 3, 3, 3, 3], 12)
   this.animations.add('die', [0, 4, 0, 4, 0, 4, 3, 3, 3, 3, 3, 3], 12)
   this.animations.play('crawl')
   this.game.physics.enable(this)
@@ -41,6 +46,12 @@ Spider.prototype.update = function () {
     this.body.velocity.x = -Spider.SPEED
   else if (this.body.touching.left || this.body.blocked.right)
     this.body.velocity.x = Spider.SPEED
+}
+Spider.prototype.die = function () {
+  this.body.enable = false
+  this.animations.play('die').onComplete.addOnce(function () {
+    this.kill()
+  }, this)
 }
 
 // * Init phase
@@ -186,7 +197,7 @@ PlayState._onHeroVsCoin = function (hero, coin) {
 PlayState._onHeroVsEnemy = function (hero, enemy) {
   if (hero.body.velocity.y > 0) {
     hero.bounce()
-    enemy.kill()
+    enemy.die()
     this.sfx.stomp.play()
   } else {
     this.sfx.stomp.play()
