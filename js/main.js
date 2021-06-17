@@ -1,3 +1,4 @@
+// * Hero
 function Hero(game, x, y) {
   Phaser.Sprite.call(this, game, x, y, 'hero')
   this.anchor.set(0.5, 0.5)
@@ -12,12 +13,29 @@ Hero.prototype.move = function (direction) {
   this.body.velocity.x = direction * SPEED
   this.x += direction * 2.5
 }
+Hero.prototype.jump = function () {
+  const JUMP_SPEED = 600
+  let canJump = this.body.touching.down
 
+  if (canJump) this.body.velocity.y = -JUMP_SPEED
+
+  return canJump
+}
+
+// * Init phase
 PlayState = {}
 window.onload = function () {
   let game = new Phaser.Game(960, 600, Phaser.AUTO, 'game')
   game.state.add('play', PlayState)
   game.state.start('play')
+}
+
+PlayState.init = function () {
+  this.keys = this.game.input.keyboard.addKeys({
+    left: Phaser.KeyCode.LEFT,
+    right: Phaser.KeyCode.RIGHT,
+    up: Phaser.KeyCode.UP
+  })
 }
 
 // * Preload phase
@@ -31,21 +49,29 @@ PlayState.preload = function () {
   this.game.load.image('grass:2x1', 'images/grass_2x1.png')
   this.game.load.image('grass:1x1', 'images/grass_1x1.png')
   this.game.load.image('hero', 'images/hero_stopped.png')
+  this.game.load.audio('sfx:jump', 'audio/jump.wav')
+  this.game.load.audio('sfx:coin', 'audio/coin.wav')
+  this.game.load.spritesheet('coin', 'images/coin_animated.png', 22, 22)
 }
 
+// * Create Phase
 PlayState.create = function () {
   this.game.add.image(0, 0, 'background')
   this._loadLevel(this.game.cache.getJSON('level:1'))
+  this.sfx = {
+    jump: this.game.add.audio('sfx:jump'),
+    coin: this.game.add.audio('sfx:coin')
+  }
 }
 
 PlayState._loadLevel = function (data) {
-  // create groups/layers needed
   this.platforms = this.game.add.group()
+  this.coins = this.game.add.group()
 
   data.platforms.forEach(this._spawnPlatform, this)
-  this._spawnCharacters({hero: data.hero})
+  this._spawnCharacters({hero: data.hero, spiders: data.spiders})
+  data.coins.forEach(this._spawnCoin, this)
 
-  // enable gravity
   const GRAVITY = 1200
   this.game.physics.arcade.gravity.y = GRAVITY
 }
@@ -62,14 +88,6 @@ PlayState._spawnPlatform = function (platform) {
   sprite.body.immovable = true
 }
 
-// * Init phase
-PlayState.init = function () {
-  this.keys = this.game.input.keyboard.addKeys({
-    left: Phaser.KeyCode.LEFT,
-    right: Phaser.KeyCode.RIGHT
-  })
-}
-
 // * Update phase
 PlayState.update = function () {
   this._handleCollisions()
@@ -78,15 +96,37 @@ PlayState.update = function () {
 
 PlayState._handleInput = function () {
   this.game.renderer.renderSession.roundPixels = true
-  if (this.keys.left.isDown) {
-    this.hero.move(-1)
-  } else if (this.keys.right.isDown) {
-    this.hero.move(1)
-  } else {
-    this.hero.move(0)
-  }
+  if (this.keys.left.isDown) this.hero.move(-1)
+  else if (this.keys.right.isDown) this.hero.move(1)
+  else this.hero.move(0)
+
+  this.keys.up.onDown.add(function () {
+    let didJump = this.hero.jump()
+    if (didJump) this.sfx.jump.play()
+  }, this)
 }
 
 PlayState._handleCollisions = function () {
   this.game.physics.arcade.collide(this.hero, this.platforms)
+  this.game.physics.arcade.overlap(
+    this.hero,
+    this.coins,
+    this._onHeroVsCoin,
+    null,
+    this
+  )
+}
+
+PlayState._spawnCoin = function (coin) {
+  let sprite = this.coins.create(coin.x, coin.y, 'coin')
+  sprite.anchor.set(0.5, 0.5)
+  sprite.animations.add('rotate', [0, 1, 2, 1], 6, true)
+  sprite.animations.play('rotate')
+  this.game.physics.enable(sprite)
+  sprite.body.allowGravity = false
+}
+
+PlayState._onHeroVsCoin = function (hero, coin) {
+  this.sfx.coin.play()
+  coin.kill()
 }
