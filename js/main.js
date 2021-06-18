@@ -4,6 +4,10 @@ function Hero(game, x, y) {
   this.anchor.set(0.5, 0.5)
   this.game.physics.enable(this)
   this.body.collideWorldBounds = true
+  this.animations.add('stop', [0])
+  this.animations.add('run', [1, 2], 8, true)
+  this.animations.add('jump', [3])
+  this.animations.add('fall', [4])
 }
 
 Hero.prototype = Object.create(Phaser.Sprite.prototype)
@@ -12,6 +16,8 @@ Hero.prototype.move = function (direction) {
   const SPEED = 200
   this.body.velocity.x = direction * SPEED
   this.x += direction * 2.5
+  if (this.body.velocity.x < 0) this.scale.x = -1
+  if (this.body.velocity.x > 0) this.scale.x = 1
 }
 Hero.prototype.jump = function () {
   const JUMP_SPEED = 600
@@ -25,7 +31,18 @@ Hero.prototype.bounce = function () {
   const BOUNCE_SPEED = 200
   this.body.velocity.y = -BOUNCE_SPEED
 }
-
+Hero.prototype._getAnimationName = function () {
+  let name = 'stop'
+  if (this.body.velocity.y < 0) name = 'jump'
+  if (this.body.velocity.y >= 0 && !this.body.touching.down) name = 'fall'
+  if (this.body.velocity.x !== 0 && this.body.touching.down) name = 'run'
+  return name
+}
+Hero.prototype.update = function () {
+  let animationName = this._getAnimationName()
+  if (this.animations.name !== animationName)
+    this.animations.play(animationName)
+}
 // * Enemies
 function Spider(game, x, y) {
   Phaser.Sprite.call(this, game, x, y, 'spider')
@@ -87,8 +104,10 @@ PlayState.preload = function () {
   this.game.load.audio('sfx:jump', 'audio/jump.wav')
   this.game.load.audio('sfx:coin', 'audio/coin.wav')
   this.game.load.audio('sfx:stomp', 'audio/stomp.wav')
+  this.game.load.spritesheet('hero', 'images/hero.png', 36, 42)
   this.game.load.spritesheet('coin', 'images/coin_animated.png', 22, 22)
   this.game.load.spritesheet('spider', 'images/spider.png', 42, 32)
+  this.game.load.spritesheet('door', 'images/door.png', 42, 66)
 }
 
 // * Create Phase
@@ -97,14 +116,12 @@ PlayState._loadLevel = function (data) {
   this.coins = this.game.add.group()
   this.spiders = this.game.add.group()
   this.enemyWalls = this.game.add.group()
-
+  this.bgDecoration = this.game.add.group()
   data.platforms.forEach(this._spawnPlatform, this)
   this._spawnCharacters({hero: data.hero, spiders: data.spiders})
   data.coins.forEach(this._spawnCoin, this)
-
   const GRAVITY = 1200
   this.game.physics.arcade.gravity.y = GRAVITY
-
   this.enemyWalls.visible = false
 }
 
@@ -142,6 +159,8 @@ PlayState._spawnEnemyWall = function (x, y, side) {
   sprite.body.immovable = true
   sprite.body.allowGravity = false
 }
+
+PlayState._spawnDoor
 
 PlayState._createHud = function () {
   const NUMBER_STR = '0123456789X '
