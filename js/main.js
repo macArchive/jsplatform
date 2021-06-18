@@ -86,6 +86,7 @@ PlayState.init = function () {
     up: Phaser.KeyCode.UP
   })
   this.coinPickupCount = 0
+  this.hasKey = false
 }
 
 // * Preload phase
@@ -98,12 +99,16 @@ PlayState.preload = function () {
   this.game.load.image('grass:4x1', 'images/grass_4x1.png')
   this.game.load.image('grass:2x1', 'images/grass_2x1.png')
   this.game.load.image('grass:1x1', 'images/grass_1x1.png')
+  this.game.load.image('key', 'images/key.png')
   this.game.load.image('invisible-wall', 'images/invisible_wall.png')
   this.game.load.image('icon:coin', 'images/coin_icon.png')
+  this.game.load.spritesheet('icon:key', 'images/key_icon.png', 34, 30)
   this.game.load.image('font:numbers', 'images/numbers.png')
   this.game.load.audio('sfx:jump', 'audio/jump.wav')
   this.game.load.audio('sfx:coin', 'audio/coin.wav')
   this.game.load.audio('sfx:stomp', 'audio/stomp.wav')
+  this.game.load.audio('sfx:key', 'audio/key.wav')
+  this.game.load.audio('sfx:door', 'audio/door.wav')
   this.game.load.spritesheet('hero', 'images/hero.png', 36, 42)
   this.game.load.spritesheet('coin', 'images/coin_animated.png', 22, 22)
   this.game.load.spritesheet('spider', 'images/spider.png', 42, 32)
@@ -120,6 +125,8 @@ PlayState._loadLevel = function (data) {
   data.platforms.forEach(this._spawnPlatform, this)
   this._spawnCharacters({hero: data.hero, spiders: data.spiders})
   data.coins.forEach(this._spawnCoin, this)
+  this._spawnDoor(data.door.x, data.door.y)
+  this._spawnKey(data.key.x, data.key.y)
   const GRAVITY = 1200
   this.game.physics.arcade.gravity.y = GRAVITY
   this.enemyWalls.visible = false
@@ -160,12 +167,33 @@ PlayState._spawnEnemyWall = function (x, y, side) {
   sprite.body.allowGravity = false
 }
 
-PlayState._spawnDoor
+PlayState._spawnDoor = function (x, y, side) {
+  this.door = this.bgDecoration.create(x, y, 'door')
+  this.door.anchor.setTo(0.5, 1)
+  this.game.physics.enable(this.door)
+  this.door.body.allowGravity = false
+}
+
+PlayState._spawnKey = function (x, y) {
+  this.key = this.bgDecoration.create(x, y, 'key')
+  this.key.anchor.set(0.5, 0.5)
+  this.game.physics.enable(this.key)
+  this.key.body.allowGravity = false
+  this.key.y -= 3
+  this.game.add
+    .tween(this.key)
+    .to({y: this.key.y + 6}, 800, Phaser.Easing.Sinusoidal.InOut)
+    .yoyo(true)
+    .loop()
+    .start()
+}
 
 PlayState._createHud = function () {
   const NUMBER_STR = '0123456789X '
   this.coinFont = this.game.add.retroFont('font:numbers', 20, 26, NUMBER_STR, 6)
-  let coinIcon = this.game.make.image(0, 0, 'icon:coin')
+  this.keyIcon = this.game.make.image(0, 19, 'icon:key')
+  let coinIcon = this.game.make.image(this.keyIcon.width + 7, 0, 'icon:coin')
+  this.keyIcon.anchor.set(0, 0.5)
   let coinScoreImg = this.game.make.image(
     coinIcon.x + coinIcon.width,
     coinIcon.height / 2,
@@ -175,6 +203,7 @@ PlayState._createHud = function () {
   this.hud = this.game.add.group()
   this.hud.add(coinIcon)
   this.hud.add(coinScoreImg)
+  this.hud.add(this.keyIcon)
   this.hud.position.set(10, 10)
 }
 
@@ -184,7 +213,9 @@ PlayState.create = function () {
   this.sfx = {
     jump: this.game.add.audio('sfx:jump'),
     coin: this.game.add.audio('sfx:coin'),
-    stomp: this.game.add.audio('sfx:stomp')
+    stomp: this.game.add.audio('sfx:stomp'),
+    key: this.game.add.audio('sfx:key'),
+    door: this.game.add.audio('sfx:door')
   }
   this._createHud()
 }
@@ -194,6 +225,7 @@ PlayState.update = function () {
   this._handleCollisions()
   this._handleInput()
   this.coinFont.text = `x${this.coinPickupCount}`
+  this.keyIcon.frame = this.hasKey ? 1 : 0
 }
 
 PlayState._handleInput = function () {
@@ -226,6 +258,22 @@ PlayState._handleCollisions = function () {
     null,
     this
   )
+  this.game.physics.arcade.overlap(
+    this.hero,
+    this.key,
+    this._onHeroVsKey,
+    null,
+    this
+  )
+  this.game.physics.arcade.overlap(
+    this.hero,
+    this.door,
+    this._onHeroVsDoor,
+    function (hero, door) {
+      return this.hasKey && hero.body.touch.down
+    },
+    this
+  )
 }
 
 PlayState._onHeroVsCoin = function (hero, coin) {
@@ -235,6 +283,7 @@ PlayState._onHeroVsCoin = function (hero, coin) {
 }
 
 PlayState._onHeroVsEnemy = function (hero, enemy) {
+  // TODO: Add a counter for enemies killed
   if (hero.body.velocity.y > 0) {
     hero.bounce()
     enemy.die()
@@ -243,4 +292,16 @@ PlayState._onHeroVsEnemy = function (hero, enemy) {
     this.sfx.stomp.play()
     this.game.state.restart()
   }
+}
+
+PlayState._onHeroVsKey = function (hero, key) {
+  this.sfx.key.play()
+  key.kill()
+  this.hasKey = true
+}
+
+PlayState._onHeroVsDoor = function (hero, door) {
+  this.sfx.door.play()
+  this.game.state.restart()
+  // TODO: Go to next level instead
 }
