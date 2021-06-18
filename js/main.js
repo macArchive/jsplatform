@@ -68,6 +68,7 @@ PlayState.init = function () {
     right: Phaser.KeyCode.RIGHT,
     up: Phaser.KeyCode.UP
   })
+  this.coinPickupCount = 0
 }
 
 // * Preload phase
@@ -81,7 +82,8 @@ PlayState.preload = function () {
   this.game.load.image('grass:2x1', 'images/grass_2x1.png')
   this.game.load.image('grass:1x1', 'images/grass_1x1.png')
   this.game.load.image('invisible-wall', 'images/invisible_wall.png')
-  this.game.load.image('hero', 'images/hero_stopped.png')
+  this.game.load.image('icon:coin', 'images/coin_icon.png')
+  this.game.load.image('font:numbers', 'images/numbers.png')
   this.game.load.audio('sfx:jump', 'audio/jump.wav')
   this.game.load.audio('sfx:coin', 'audio/coin.wav')
   this.game.load.audio('sfx:stomp', 'audio/stomp.wav')
@@ -90,16 +92,6 @@ PlayState.preload = function () {
 }
 
 // * Create Phase
-PlayState.create = function () {
-  this.game.add.image(0, 0, 'background')
-  this._loadLevel(this.game.cache.getJSON('level:1'))
-  this.sfx = {
-    jump: this.game.add.audio('sfx:jump'),
-    coin: this.game.add.audio('sfx:coin'),
-    stomp: this.game.add.audio('sfx:stomp')
-  }
-}
-
 PlayState._loadLevel = function (data) {
   this.platforms = this.game.add.group()
   this.coins = this.game.add.group()
@@ -151,10 +143,38 @@ PlayState._spawnEnemyWall = function (x, y, side) {
   sprite.body.allowGravity = false
 }
 
+PlayState._createHud = function () {
+  const NUMBER_STR = '0123456789X '
+  this.coinFont = this.game.add.retroFont('font:numbers', 20, 26, NUMBER_STR, 6)
+  let coinIcon = this.game.make.image(0, 0, 'icon:coin')
+  let coinScoreImg = this.game.make.image(
+    coinIcon.x + coinIcon.width,
+    coinIcon.height / 2,
+    this.coinFont
+  )
+  coinScoreImg.anchor.set(0, 0.5)
+  this.hud = this.game.add.group()
+  this.hud.add(coinIcon)
+  this.hud.add(coinScoreImg)
+  this.hud.position.set(10, 10)
+}
+
+PlayState.create = function () {
+  this.game.add.image(0, 0, 'background')
+  this._loadLevel(this.game.cache.getJSON('level:1'))
+  this.sfx = {
+    jump: this.game.add.audio('sfx:jump'),
+    coin: this.game.add.audio('sfx:coin'),
+    stomp: this.game.add.audio('sfx:stomp')
+  }
+  this._createHud()
+}
+
 // * Update phase
 PlayState.update = function () {
   this._handleCollisions()
   this._handleInput()
+  this.coinFont.text = `x${this.coinPickupCount}`
 }
 
 PlayState._handleInput = function () {
@@ -192,6 +212,7 @@ PlayState._handleCollisions = function () {
 PlayState._onHeroVsCoin = function (hero, coin) {
   this.sfx.coin.play()
   coin.kill()
+  this.coinPickupCount++
 }
 
 PlayState._onHeroVsEnemy = function (hero, enemy) {
