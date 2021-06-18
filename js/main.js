@@ -1,3 +1,12 @@
+/*
+  TODO: Add a loading state
+  TODO: Add background music
+  TODO: Change jump height based on length of key press
+  TODO: Main character dying animation
+  TODO: Enter door animation
+  TDOO: Camera fade in and out
+*/
+
 // * Hero
 function Hero(game, x, y) {
   Phaser.Sprite.call(this, game, x, y, 'hero')
@@ -76,10 +85,11 @@ PlayState = {}
 window.onload = function () {
   let game = new Phaser.Game(960, 600, Phaser.AUTO, 'game')
   game.state.add('play', PlayState)
-  game.state.start('play')
+  game.state.start('play', true, false, {level: 0})
 }
 
-PlayState.init = function () {
+const LEVEL_COUNT = 2
+PlayState.init = function (data) {
   this.keys = this.game.input.keyboard.addKeys({
     left: Phaser.KeyCode.LEFT,
     right: Phaser.KeyCode.RIGHT,
@@ -87,10 +97,12 @@ PlayState.init = function () {
   })
   this.coinPickupCount = 0
   this.hasKey = false
+  this.level = (data.level || 0) % LEVEL_COUNT
 }
 
 // * Preload phase
 PlayState.preload = function () {
+  this.game.load.json('level:0', 'data/level00.json')
   this.game.load.json('level:1', 'data/level01.json')
   this.game.load.image('background', 'images/background.png')
   this.game.load.image('ground', 'images/ground.png')
@@ -209,7 +221,7 @@ PlayState._createHud = function () {
 
 PlayState.create = function () {
   this.game.add.image(0, 0, 'background')
-  this._loadLevel(this.game.cache.getJSON('level:1'))
+  this._loadLevel(this.game.cache.getJSON(`level:${this.level}`))
   this.sfx = {
     jump: this.game.add.audio('sfx:jump'),
     coin: this.game.add.audio('sfx:coin'),
@@ -270,7 +282,7 @@ PlayState._handleCollisions = function () {
     this.door,
     this._onHeroVsDoor,
     function (hero, door) {
-      return this.hasKey && hero.body.touch.down
+      return this.hasKey && hero.body.touching.down
     },
     this
   )
@@ -290,7 +302,7 @@ PlayState._onHeroVsEnemy = function (hero, enemy) {
     this.sfx.stomp.play()
   } else {
     this.sfx.stomp.play()
-    this.game.state.restart()
+    this.game.state.restart(true, false, {level: this.level})
   }
 }
 
@@ -302,6 +314,5 @@ PlayState._onHeroVsKey = function (hero, key) {
 
 PlayState._onHeroVsDoor = function (hero, door) {
   this.sfx.door.play()
-  this.game.state.restart()
-  // TODO: Go to next level instead
+  this.game.state.restart(true, false, {level: this.level + 1})
 }
